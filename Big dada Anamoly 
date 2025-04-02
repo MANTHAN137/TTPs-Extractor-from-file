@@ -1,0 +1,46 @@
+extract_data.sh
+
+#!/bin/bash
+
+Extract Loan Data from Hive
+
+HIVE_QUERY="SELECT Customer_ID, Loan_Amount, Annual_Income, Loan_Frequency, Credit_Score, Address_Changes FROM loan_data;" OUTPUT_FILE="/mnt/data/loan_fraud_data.csv"
+
+hive -e "$HIVE_QUERY" > "$OUTPUT_FILE" if [ $? -ne 0 ]; then echo "Hive data extraction failed!" exit 1 fi
+
+echo "Data extraction successful: $OUTPUT_FILE"
+
+detect_fraud.sh
+
+#!/bin/bash
+
+Detect Fraudulent Transactions
+
+INPUT_FILE="/mnt/data/loan_fraud_data.csv" ANOMALY_FILE="/mnt/data/fraud_anomalies.txt" rm -f "$ANOMALY_FILE"
+
+awk -F',' 'NR>1 && ($4 > 5 || $5 < 400 || $6 > 3) { print $0 >> ""$ANOMALY_FILE"" }' "$INPUT_FILE"
+
+if [ -s "$ANOMALY_FILE" ]; then echo "Fraudulent transactions detected! Check $ANOMALY_FILE" exit 2 else echo "No anomalies found." fi
+
+alert_fraud.sh
+
+#!/bin/bash
+
+Alert if Fraud Detected
+
+ANOMALY_FILE="/mnt/data/fraud_anomalies.txt" LOG_FILE="/mnt/data/fraud_alerts.log"
+
+if [ -s "$ANOMALY_FILE" ]; then echo "$(date): Fraud detected! Check $ANOMALY_FILE" >> "$LOG_FILE" echo "ALERT: Fraud detected!" # Add email or notification system here else echo "No fraud detected." fi
+
+fraud_detection.jil
+
+insert_job: loan_fraud_pipeline job_type: BOX owner: your_username machine: your_server_hostname start_times: "08:00" run_calendar: workdays description: "Loan Fraud Detection Pipeline"
+
+insert_job: extract_data job_type: CMD box_name: loan_fraud_pipeline command: /mnt/data/extract_data.sh std_out_file: /mnt/data/logs/extract_data.out std_err_file: /mnt/data/logs/extract_data.err
+
+insert_job: detect_fraud job_type: CMD box_name: loan_fraud_pipeline command: /mnt/data/detect_fraud.sh std_out_file: /mnt/data/logs/detect_fraud.out std_err_file: /mnt/data/logs/detect_fraud.err condition: success(extract_data)
+
+insert_job: alert_fraud job_type: CMD box_name: loan_fraud_pipeline command: /mnt/data/alert_fraud.sh std_out_file: /mnt/data/logs/alert_fraud.out std_err_file: /mnt/data/logs/alert_fraud.err condition: success(detect_fraud)
+
+insert_job: end_pipeline job_type: CMD box_name: loan_fraud_pipeline command: echo "Pipeline Completed Successfully" condition: success(alert_fraud)
+
